@@ -1,2 +1,8 @@
-#my text
+# my text
 text/**
+
+#generated images
+image/**
+
+# draft
+draft.py
