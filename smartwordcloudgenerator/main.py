@@ -22,6 +22,9 @@ nltk.data.path.append(nltk_data_path)
 FONT_PATH = os.environ.get('FONT_PATH', os.path.join(FILE, 'DroidSansMono.ttf'))
 
 class MyCounter(Counter):
+    """
+    Define multiplication between dict and scalar for convenience.
+    """
     def __mul__(self, scalar):
         if isinstance(scalar, (int, float)):
             return MyCounter({k: self[k] * scalar for k in self})
@@ -29,6 +32,15 @@ class MyCounter(Counter):
 
 class Canvas():
     def __init__(self, height, width, mask = None, margin = 2, bounding_width = None, background = None):
+        """
+        Place to draw on.
+
+        height, width: shape of canvas.
+        mask: 0 means can be drawn and 1 stands for the opposite.
+        margin: smallest distance between two words.
+        bounding_width: width of bounding line. None means no bounding line.
+        background: background picture of the same shape.
+        """
         self.height = height
         self.width = width
         self.margin = margin
@@ -47,6 +59,15 @@ class Canvas():
             self.integral = np.zeros((height, width), dtype=np.uint32)
     
     def draw_word(self, word, font, seed = 777, color_mode = 'contrast', color = None):
+        """
+        draw a word on the canvas.
+
+        word: word to draw.
+        font: font to use.
+        seed: random seed for color generation.
+        color_mode: ways to color the word. 'contrast' 'random' or 'uniform'.
+        color: if color_mode is 'uniform', this stands for the color to use.
+        """
         hits = 0
         res = []
         box_size = self.draw.textbbox((0, 0), word, font=font, anchor="lt")
@@ -87,6 +108,9 @@ class Canvas():
         return True
     
     def save(self, path):
+        """
+        Save the picture to path.
+        """
         self.img.save(path)
 
 
@@ -95,6 +119,11 @@ class Canvas():
 
 class SmartWordCloudGenerator(object):
     def __init__(self, default_stopwords = True, nlp_improvement = True, font_path=None):
+        """
+        default_stopwords: Add default stopwords to stopwords if True, doing nothing if False.
+        nlp_improvement: Use nlp technique to treat similar words as the same. (apple and apples for example).
+        font_path: Path to the font to use. None means use the default font.
+        """
         
         # initialize
         self.counter = MyCounter()
@@ -118,6 +147,9 @@ class SmartWordCloudGenerator(object):
     
 
     def _preprocess(self, text):
+        """
+        preprocess the text, purify it.
+        """
         text = text.lower()
         text = re.findall(r'\b[a-zA-Z\'-]+\b', text)
         text = [word for word in text if word not in self.stopwords]
@@ -127,6 +159,15 @@ class SmartWordCloudGenerator(object):
         
 
     def add_text(self, text, frequency_weight=1, focus = None, focusing_radius = 10, focusing_func = lambda x: 1 - x):
+        """
+        Read in a text and change the weight in self.counter.
+
+        frequency_weight: new_weight = prev_weight + frequency * frequency_weight.
+        focus: a dict of words to focus on and their weights.
+        focusing_radius: Calculate all words in the radius of a focused word.
+        focusing_func: for every word in the focusing_radius, dist = (self_pos - focused_word_pos) / focusing_radius,
+        new_weight = prev_weight + focusing_func(dist) * focus[word]
+        """
         text = self._preprocess(text)
         word_count = MyCounter(text)
         self.counter += word_count * frequency_weight
@@ -143,6 +184,9 @@ class SmartWordCloudGenerator(object):
                         self.counter += {text[idx]: focus[w] * focusing_func(abs(idx - indice) / focusing_radius)}
 
     def add_stopword(self, word):
+        """
+        add a stopword.
+        """
         if self.nlp_improvement:
             word = self.lemmatizer.lemmatize(word)
         self.stopwords.add(word)
@@ -150,6 +194,9 @@ class SmartWordCloudGenerator(object):
 
 
     def add_stopwords(self, words:list):
+        """
+        add stopwords.
+        """
         for word in words:
             self.add_stopword(word)
 
@@ -158,7 +205,22 @@ class SmartWordCloudGenerator(object):
                  margin = 6, bounding_width = None, seed = 114, color_mode = 'contrast',
                  color = None, print_res = True, save_path = "tmp.png", background_path = None,
                  ):
+        """
+        generate word cloud.
 
+        max_font_size, min_font_size: the maximum and minimum font size.
+        font_size_func: font_size = font_size_func(frequency)  (frequency ranges from 0 to 1)
+        momentum: new_freq = momentum * prev_freq + (1 - momentum) * actual_freq
+        max_words: Maximum number of words.
+        mask: A mask of the same shape. 0 means can be drawn, others means can't.
+        margin: The least distance between two words.
+        bounding_width: The width of bounding line. None means no bounding line.
+        color_mode: Ways to choose colors of words. Can be 'contrast', 'uniform' or 'random'
+        color: if color_mode == 'uniform', color shall be the RGB representation of the color.
+        print_res: Whether to print the res.
+        save path: Path to save generated picture.
+        background_path: Path of the background picture, None means no background.
+        """
         background = None
         if background_path != None:
             background = Image.open(background_path)
