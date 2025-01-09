@@ -29,19 +29,25 @@ class MyCounter(Counter):
         return NotImplemented
 
 class Canvas():
-    def __init__(self, height, width, mask = None, margin = 2, bounding_width = None):
+    def __init__(self, height, width, mask = None, margin = 2, bounding_width = None, background = None):
         self.height = height
         self.width = width
         self.margin = margin
-        self.img = Image.new("RGB", (width, height))
+        if background is None:
+            self.img = Image.new("RGB", (width, height))
+        else:
+            self.img = background
         self.draw = ImageDraw.Draw(self.img)
         self.bounding_width = bounding_width
         if mask is not None:
-            self.integral = np.cumsum(np.cumsum(255 * mask, axis=1), axis=0).astype(np.uint32)
+            if mask.shape != (height, width):
+                print(f"Mask shape {mask.shape} doesn't match the picture shape ({height}, {width}).")
+                raise NotImplementedError
+            self.integral = np.cumsum(np.cumsum(mask, axis=1), axis=0).astype(np.uint32)
         else:
             self.integral = np.zeros((height, width), dtype=np.uint32)
     
-    def draw_word(self, word, font, seed = 777, color = (255, 255, 255)):
+    def draw_word(self, word, font, seed = 777, color_mode = 'contrast', color = None):
         hits = 0
         res = []
         box_size = self.draw.textbbox((0, 0), word, font=font, anchor="lt")
@@ -57,6 +63,21 @@ class Canvas():
         rng = np.random.default_rng(seed)
         tmp = rng.integers(0, hits, dtype = np.uint32)
         h, w = res[tmp]
+        if color_mode == 'random':
+            rng = np.random.default_rng(seed)
+            color = tuple(rng.integers(0, 256, size=(3), dtype=np.uint32))
+        elif color_mode == 'contrast':
+            region = np.asarray(self.img)[h: h + size_h + 1, w: w + size_w + 1, :]
+            color = np.mean(region, axis=(0, 1))
+            color = (round(255 - color[0]), round(255 - color[1]), round(255 - color[2]))
+        elif color_mode == 'uniform':
+            if color == None:
+                print("Missing the color parameter.")
+                raise NotImplementedError
+            else:
+                color = color
+        else:
+            raise NotImplementedError
         if self.bounding_width is not None:
             self.draw.rectangle([w, h, w + size_w, h + size_h], outline=color, width=self.bounding_width)
         self.draw.text((w + self.margin // 2, h + self.margin // 2), word, fill=color, font=font, anchor="lt")
@@ -133,13 +154,18 @@ class SmartWordCloudGenerator(object):
         for word in words:
             self.add_stopword(word)
 
+    def generate(self, max_font_size = 50, min_font_size = 20, font_size_func = lambda x: x ** 0.6, 
+                 momentum = 0.9, width = 400, height = 400, max_words = 50, mask = None, 
+                 margin = 6, bounding_width = None, seed = 114, color_mode = 'contrast',
+                 color = None, print_res = True, save_path = "image/tmp.png", background_path = None,
+                 ):
 
-    def generate(self, max_font_size = 70, min_font_size = 20, font_size_func = lambda x: x ** 0.6, 
-                 momentum = 0.5, width = 400, height = 400, max_words = 50, mask = None, 
-                 margin = 6, bounding_width = None, seed = 114, color_mode = 'random', 
-                 print_res = True, save_path = "image/tmp.png"):
-
-        canvas = Canvas(height, width, mask, margin, bounding_width)
+        background = None
+        if background_path != None:
+            background = Image.open(background_path)
+            background = background.convert("RGB")
+            background = background.resize((height, width))
+        canvas = Canvas(height, width, mask, margin, bounding_width, background=background)
 
         sorted_items = sorted(self.counter.items(), key=lambda item: item[1], reverse=True)
         self.counter = dict(sorted_items)
@@ -156,13 +182,9 @@ class SmartWordCloudGenerator(object):
                     print("Break because font size are too small.")
                 break
             font = ImageFont.truetype(self.font_path, font_size)
-            if color_mode == 'random':
-                rng = np.random.default_rng(seed + num)
-                tmp = rng.integers(0, 100000, dtype = np.uint32)
-                color = tuple(rng.integers(0, 256, size=(3), dtype=np.uint32))
-            else:
-                raise NotImplementedError
-            res = canvas.draw_word(word, font, seed = tmp, color=color)
+            rng = np.random.default_rng(seed + num)
+            tmp = rng.integers(0, 100000, dtype = np.uint32)
+            res = canvas.draw_word(word, font, seed = tmp, color_mode = color_mode, color = color)
             if res == False:
                 if print_res:
                     print("Break because no space to draw more words.")
@@ -187,4 +209,9 @@ if __name__ == '__main__':
     text = "".join(lines) 
     gen.add_text(text)
     gen.add_stopwords(['a', 'little',  'prince'])
-    gen.generate()
+    mask = np.zeros((400, 400))
+    for i in range(400):
+        for j in range(400):
+            if((i - 200)**2 + (j - 200)**2) > 40000:
+                mask[i][j] = 1
+    gen.generate(mask=mask, background_path="image/background.jpg")
