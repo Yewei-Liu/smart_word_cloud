@@ -1,8 +1,12 @@
 # my text
 text/**
 
-#generated images
+# generated images
 image/**
 
 # draft
 draft.py
+
+# temporary
+*.txt
+*.png

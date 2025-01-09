@@ -11,14 +11,13 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from collections import Counter
-import string
 import re
 import os
 from PIL import Image, ImageDraw, ImageFont
 
 # set relative path
 FILE = os.path.dirname(__file__)
-nltk_data_path = os.path.join(FILE, '../data')  
+nltk_data_path = os.path.join(FILE, 'data')  
 nltk.data.path.append(nltk_data_path)
 FONT_PATH = os.environ.get('FONT_PATH', os.path.join(FILE, 'DroidSansMono.ttf'))
 
@@ -157,7 +156,7 @@ class SmartWordCloudGenerator(object):
     def generate(self, max_font_size = 50, min_font_size = 20, font_size_func = lambda x: x ** 0.6, 
                  momentum = 0.9, width = 400, height = 400, max_words = 50, mask = None, 
                  margin = 6, bounding_width = None, seed = 114, color_mode = 'contrast',
-                 color = None, print_res = True, save_path = "image/tmp.png", background_path = None,
+                 color = None, print_res = True, save_path = "tmp.png", background_path = None,
                  ):
 
         background = None
@@ -200,18 +199,3 @@ class SmartWordCloudGenerator(object):
             print(f"Picture saved to {save_path}")
 
 
-if __name__ == '__main__':
-    gen = SmartWordCloudGenerator()
-    input_path = 'text/the little prince.txt'
-    lines = None
-    with open(input_path, encoding='utf-8') as f:
-        lines = f.readlines()
-    text = "".join(lines) 
-    gen.add_text(text)
-    gen.add_stopwords(['a', 'little',  'prince'])
-    mask = np.zeros((400, 400))
-    for i in range(400):
-        for j in range(400):
-            if((i - 200)**2 + (j - 200)**2) > 40000:
-                mask[i][j] = 1
-    gen.generate(mask=mask, background_path="image/background.jpg")
