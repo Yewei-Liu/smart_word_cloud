@@ -29,43 +29,45 @@ class MyCounter(Counter):
         return NotImplemented
 
 class Canvas():
-    def __init__(self, height, width, mask = None, margin = 2):
+    def __init__(self, height, width, mask = None, margin = 2, bounding_width = None):
         self.height = height
         self.width = width
         self.margin = margin
-        self.img_grey = Image.new("L", (width, height))
-        self.draw = ImageDraw.Draw(self.img_grey)
+        self.img = Image.new("RGB", (width, height))
+        self.draw = ImageDraw.Draw(self.img)
+        self.bounding_width = bounding_width
         if mask is not None:
             self.integral = np.cumsum(np.cumsum(255 * mask, axis=1), axis=0).astype(np.uint32)
         else:
             self.integral = np.zeros((height, width), dtype=np.uint32)
     
-    def draw_word(self, word, font, seed = 777):
+    def draw_word(self, word, font, seed = 777, color = (255, 255, 255)):
         hits = 0
         res = []
         box_size = self.draw.textbbox((0, 0), word, font=font, anchor="lt")
-        size_h, size_w = box_size[3] + self.margin, box_size[2] + self.margin
-        for i in range(1, self.height - size_h):
-            for j in range(1, self.width - size_w):
-                area = self.integral[i, j] + self.integral[i + size_h, j + size_w] - self.integral[i + size_h, j] - self.integral[i, j + size_w]
+        size_h, size_w = box_size[3] - box_size[1] + self.margin, box_size[2] - box_size[0] + self.margin
+        for i in range(1, self.height - size_h - 2):
+            for j in range(1, self.width - size_w - 2):
+                area = self.integral[i - 1, j - 1] + self.integral[i + size_h, j + size_w] - self.integral[i + size_h, j - 1] - self.integral[i - 1, j + size_w]
                 if area == 0:
                     hits += 1
-                    res.append((i + 1, j + 1))
+                    res.append((i, j))
         if hits == 0:
             return False
         rng = np.random.default_rng(seed)
         tmp = rng.integers(0, hits, dtype = np.uint32)
         h, w = res[tmp]
-        print(h, h + size_h, w, w + size_w)
-        self.draw.text((w + self.margin // 2, h + self.margin // 2), word, fill='white', font=font)
+        if self.bounding_width is not None:
+            self.draw.rectangle([w, h, w + size_w, h + size_h], outline=color, width=self.bounding_width)
+        self.draw.text((w + self.margin // 2, h + self.margin // 2), word, fill=color, font=font, anchor="lt")
         tmp_array = np.zeros((self.height, self.width))
-        tmp_array[h: h + size_h, w: w + size_w] = 1
+        tmp_array[h: h + size_h + 1, w: w + size_w + 1] = 1
         tmp_array = np.cumsum(np.cumsum(tmp_array.astype(np.uint32), axis=1), axis=0)
         self.integral += tmp_array
         return True
     
-    def save(self, path, name):
-        self.img_grey.save(path + name + '.png')
+    def save(self, path):
+        self.img.save(path)
 
 
 
@@ -132,32 +134,48 @@ class SmartWordCloudGenerator(object):
             self.add_stopword(word)
 
 
-    def generate(self, max_font_size = 100, min_font_size = 10, font_size_func = lambda x: x, width = 400, height = 400, max_words = 50, mask = None, margin = 6):
+    def generate(self, max_font_size = 70, min_font_size = 20, font_size_func = lambda x: x ** 0.6, 
+                 momentum = 0.5, width = 400, height = 400, max_words = 50, mask = None, 
+                 margin = 6, bounding_width = None, seed = 114, color_mode = 'random', 
+                 print_res = True, save_path = "image/tmp.png"):
 
-        canvas = Canvas(height, width, mask, margin)
+        canvas = Canvas(height, width, mask, margin, bounding_width)
 
         sorted_items = sorted(self.counter.items(), key=lambda item: item[1], reverse=True)
         self.counter = dict(sorted_items)
         first = next(iter(self.counter.items()))
         maxn = first[1]
         num = 0
+        m = 1
         for word in self.counter:
             freq = self.counter[word] / maxn
-            font_size = int(round(font_size_func(freq) * max_font_size))
-            print(word, font_size)
+            m = momentum * m + (1 - momentum) * freq
+            font_size = int(round(font_size_func(m) * max_font_size))
             if(font_size < min_font_size):
+                if print_res:
+                    print("Break because font size are too small.")
                 break
             font = ImageFont.truetype(self.font_path, font_size)
-            res = canvas.draw_word(word, font, seed=num)
-            print(res)
+            if color_mode == 'random':
+                rng = np.random.default_rng(seed + num)
+                tmp = rng.integers(0, 100000, dtype = np.uint32)
+                color = tuple(rng.integers(0, 256, size=(3), dtype=np.uint32))
+            else:
+                raise NotImplementedError
+            res = canvas.draw_word(word, font, seed = tmp, color=color)
             if res == False:
+                if print_res:
+                    print("Break because no space to draw more words.")
                 break
             num += 1
             if num >= max_words:
+                if print_res:
+                    print("Break because reach the limit of maximum word numbers.")
                 break
-        print(num)
-        
-        canvas.save("image/", "tmp")
+        canvas.save(save_path)
+        if print_res:
+            print(f"Successfully generated a word cloud of {num:d} words ~~~")
+            print(f"Picture saved to {save_path}")
 
 
 if __name__ == '__main__':
@@ -168,5 +186,5 @@ if __name__ == '__main__':
         lines = f.readlines()
     text = "".join(lines) 
     gen.add_text(text)
-    print(gen.counter)
+    gen.add_stopwords(['a', 'little',  'prince'])
     gen.generate()
