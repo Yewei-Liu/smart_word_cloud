@@ -10,11 +10,11 @@
 ![Example Image](thelittleprince.png)
 
 # features
-- **Smart Text Processing: Using nlp tricks to better process words.
-- **Flexible Designs: Can flexibly change the size, many intermidiate functions etc.
-- **Fast: Using 2D Prefix Sum to speed up the detection of empty space.
-- **Attractive: Adding breath-taking background and set arbitrary shape and color   for your word cloud.
-- **Easy to use: With only a few lines of codes, you can generate your own word cloud.
+- Smart Text Processing: Using nlp tricks to better process words.
+- Flexible Designs: Can flexibly change the size, many intermidiate functions etc.
+- Fast: Using 2D Prefix Sum to speed up the detection of empty space.
+- Attractive: Adding breath-taking background and set arbitrary shape and color   for your word cloud.
+- Easy to use: With only a few lines of codes, you can generate your own word cloud.
 
 # download
 `pip install smartwordcloudgenerator`
