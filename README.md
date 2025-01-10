@@ -38,5 +38,5 @@ gen.generate(color_mode='contrast', background_path='background.jpg')
 you can choose the input and the background by yourself
 
 # More
-More detailed tutorial is coming soon.
+See detailed tutorial at *tutorial.ipynb*.
 If you have any advice or thoughts, feel free to contact me :)
